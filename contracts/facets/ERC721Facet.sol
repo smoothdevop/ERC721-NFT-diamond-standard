@@ -437,7 +437,7 @@ contract DiamondNFT is IERC721 {
     ) internal virtual {}
 
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        // LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        // return ds.supportedInterfaces[interfaceId];
+        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
+        return ds.supportedInterfaces[interfaceId];
     }
 }
