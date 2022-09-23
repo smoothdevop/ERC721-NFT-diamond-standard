@@ -1,37 +1,24 @@
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v4.6.0) (token/ERC721/ERC721.sol)
+// OpenZeppelin Contracts (last updated v4.7.0) (token/ERC721/ERC721.sol)
 
 pragma solidity ^0.8.0;
 
-import {LibDiamond} from "../libraries/LibDiamond.sol";
-import "../interfaces/IERC721.sol";
-import "../interfaces/IERC721Receiver.sol";
-import "../libraries/Address.sol";
-import "../libraries/String.sol";
-import "../libraries/Counters.sol";
-import "../libraries/AppStorage.sol";
+// import "../utils/ERC721.sol";
+import "../../interfaces/IERC721Receiver.sol";
+import "../../interfaces/IERC721Metadata.sol";
+import "../../libraries/Address.sol";
+import "../../libraries/String.sol";
+import "../../libraries/AppStorage.sol";
 
 /**
  * @dev Implementation of https://eips.ethereum.org/EIPS/eip-721[ERC721] Non-Fungible Token Standard, including
  * the Metadata extension, but not including the Enumerable extension, which is available separately as
  * {ERC721Enumerable}.
  */
-contract DiamondNFT is IERC721 {
+contract ERC721 is IERC721Metadata {
+    AppStorage internal s;
     using Address for address;
     using Strings for uint256;
-    using Counters for Counters.Counter;
-    Counters.Counter _tokenIdCounter;
-    AppStorage internal s;
-
-    /**
-    //  * @dev See {IERC165-supportsInterface}.
-    //  */
-    // function supportsInterface(bytes4 interfaceId) public view  returns (bool) {
-    //     return
-    //         interfaceId == type(IERC721).interfaceId ||
-    //         interfaceId == type(IERC721Metadata).interfaceId ||
-    //         super.supportsInterface(interfaceId);
-    // }
 
     /**
      * @dev See {IERC721-balanceOf}.
@@ -45,7 +32,7 @@ contract DiamondNFT is IERC721 {
      * @dev See {IERC721-ownerOf}.
      */
     function ownerOf(uint256 tokenId) public view virtual override returns (address) {
-        address owner = s._owners[tokenId];
+        address owner = _ownerOf(tokenId);
         require(owner != address(0), "ERC721: invalid token ID");
         return owner;
     }
@@ -53,34 +40,21 @@ contract DiamondNFT is IERC721 {
     /**
      * @dev See {IERC721Metadata-name}.
      */
-    function name() public view returns (string memory) {
+    function name() public view virtual override returns (string memory) {
         return s._name;
     }
 
     /**
      * @dev See {IERC721Metadata-symbol}.
      */
-    function symbol() public view returns (string memory) {
+    function symbol() public view virtual override returns (string memory) {
         return s._symbol;
-    }
-
-    /**
-     *@notice function to mint nft tokens
-     *@dev i didn't inherit/implement ERC721UriStorage,
-     *so our tokes won't have any images to display.
-     *this is for test purpose and not production.
-     */
-    function mint(address to) public {
-        require(msg.sender == s.owner, "Not owner");
-        uint256 tokenId = _tokenIdCounter.current();
-        _tokenIdCounter.increment();
-        _safeMint(to, tokenId);
     }
 
     /**
      * @dev See {IERC721Metadata-tokenURI}.
      */
-    function tokenURI(uint256 tokenId) public view returns (string memory) {
+    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
         _requireMinted(tokenId);
 
         string memory baseURI = _baseURI();
@@ -100,10 +74,10 @@ contract DiamondNFT is IERC721 {
      * @dev See {IERC721-approve}.
      */
     function approve(address to, uint256 tokenId) public virtual override {
-        address owner = DiamondNFT.ownerOf(tokenId);
+        address owner = ERC721.ownerOf(tokenId);
         require(to != owner, "ERC721: approval to current owner");
 
-        require(msg.sender == owner || isApprovedForAll(owner, msg.sender), "ERC721: approve caller is not token owner nor approved for all");
+        require(msg.sender == owner || isApprovedForAll(owner, msg.sender), "ERC721: approve caller is not token owner or approved for all");
 
         _approve(to, tokenId);
     }
@@ -140,7 +114,7 @@ contract DiamondNFT is IERC721 {
         uint256 tokenId
     ) public virtual override {
         //solhint-disable-next-line max-line-length
-        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not token owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not token owner or approved");
 
         _transfer(from, to, tokenId);
     }
@@ -165,7 +139,7 @@ contract DiamondNFT is IERC721 {
         uint256 tokenId,
         bytes memory data
     ) public virtual override {
-        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not token owner nor approved");
+        require(_isApprovedOrOwner(msg.sender, tokenId), "ERC721: caller is not token owner or approved");
         _safeTransfer(from, to, tokenId, data);
     }
 
@@ -198,6 +172,13 @@ contract DiamondNFT is IERC721 {
     }
 
     /**
+     * @dev Returns the owner of the `tokenId`. Does NOT revert if token doesn't exist
+     */
+    function _ownerOf(uint256 tokenId) internal view virtual returns (address) {
+        return s._owners[tokenId];
+    }
+
+    /**
      * @dev Returns whether `tokenId` exists.
      *
      * Tokens can be managed by their owner or approved accounts via {approve} or {setApprovalForAll}.
@@ -206,7 +187,7 @@ contract DiamondNFT is IERC721 {
      * and stop existing when they are burned (`_burn`).
      */
     function _exists(uint256 tokenId) internal view virtual returns (bool) {
-        return s._owners[tokenId] != address(0);
+        return _ownerOf(tokenId) != address(0);
     }
 
     /**
@@ -217,7 +198,7 @@ contract DiamondNFT is IERC721 {
      * - `tokenId` must exist.
      */
     function _isApprovedOrOwner(address spender, uint256 tokenId) internal view virtual returns (bool) {
-        address owner = DiamondNFT.ownerOf(tokenId);
+        address owner = ERC721.ownerOf(tokenId);
         return (spender == owner || isApprovedForAll(owner, spender) || getApproved(tokenId) == spender);
     }
 
@@ -266,7 +247,17 @@ contract DiamondNFT is IERC721 {
 
         _beforeTokenTransfer(address(0), to, tokenId);
 
-        s._balances[to] += 1;
+        // Check that tokenId was not minted by `_beforeTokenTransfer` hook
+        require(!_exists(tokenId), "ERC721: token already minted");
+
+        unchecked {
+            // Will not overflow unless all 2**256 token ids are minted to the same owner.
+            // Given that tokens are minted one by one, it is impossible in practice that
+            // this ever happens. Might change if we allow batch minting.
+            // The ERC fails to describe this case.
+            s._balances[to] += 1;
+        }
+
         s._owners[tokenId] = to;
 
         emit Transfer(address(0), to, tokenId);
@@ -277,6 +268,7 @@ contract DiamondNFT is IERC721 {
     /**
      * @dev Destroys `tokenId`.
      * The approval is cleared when the token is burned.
+     * This is an internal function that does not check if the sender is authorized to operate on the token.
      *
      * Requirements:
      *
@@ -285,14 +277,21 @@ contract DiamondNFT is IERC721 {
      * Emits a {Transfer} event.
      */
     function _burn(uint256 tokenId) internal virtual {
-        address owner = DiamondNFT.ownerOf(tokenId);
+        address owner = ERC721.ownerOf(tokenId);
 
         _beforeTokenTransfer(owner, address(0), tokenId);
 
-        // Clear approvals
-        _approve(address(0), tokenId);
+        // Update ownership in case tokenId was transferred by `_beforeTokenTransfer` hook
+        owner = ERC721.ownerOf(tokenId);
 
-        s._balances[owner] -= 1;
+        // Clear approvals
+        delete s._tokenApprovals[tokenId];
+
+        unchecked {
+            // Cannot overflow, as that would require more tokens to be burned/transferred
+            // out than the owner initially received through minting and transferring in.
+            s._balances[owner] -= 1;
+        }
         delete s._owners[tokenId];
 
         emit Transfer(owner, address(0), tokenId);
@@ -316,16 +315,26 @@ contract DiamondNFT is IERC721 {
         address to,
         uint256 tokenId
     ) internal virtual {
-        require(DiamondNFT.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
+        require(ERC721.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
         require(to != address(0), "ERC721: transfer to the zero address");
 
         _beforeTokenTransfer(from, to, tokenId);
 
-        // Clear approvals from the previous owner
-        _approve(address(0), tokenId);
+        // Check that tokenId was not transferred by `_beforeTokenTransfer` hook
+        require(ERC721.ownerOf(tokenId) == from, "ERC721: transfer from incorrect owner");
 
-        s._balances[from] -= 1;
-        s._balances[to] += 1;
+        // Clear approvals from the previous owner
+        delete s._tokenApprovals[tokenId];
+
+        unchecked {
+            // `_balances[from]` cannot overflow for the same reason as described in `_burn`:
+            // `from`'s balance is the number of token held, which is at least one before the current
+            // transfer.
+            // `_balances[to]` could overflow in the conditions described in `_mint`. That would require
+            // all 2**256 token ids to be minted, which in practice is impossible.
+            s._balances[from] -= 1;
+            s._balances[to] += 1;
+        }
         s._owners[tokenId] = to;
 
         emit Transfer(from, to, tokenId);
@@ -340,7 +349,7 @@ contract DiamondNFT is IERC721 {
      */
     function _approve(address to, uint256 tokenId) internal virtual {
         s._tokenApprovals[tokenId] = to;
-        emit Approval(DiamondNFT.ownerOf(tokenId), to, tokenId);
+        emit Approval(ERC721.ownerOf(tokenId), to, tokenId);
     }
 
     /**
@@ -400,8 +409,8 @@ contract DiamondNFT is IERC721 {
     }
 
     /**
-     * @dev Hook that is called before any token transfer. This includes minting
-     * and burning.
+     * @dev Hook that is called before any (single) token transfer. This includes minting and burning.
+     * See {_beforeConsecutiveTokenTransfer}.
      *
      * Calling conditions:
      *
@@ -420,8 +429,8 @@ contract DiamondNFT is IERC721 {
     ) internal virtual {}
 
     /**
-     * @dev Hook that is called after any transfer of tokens. This includes
-     * minting and burning.
+     * @dev Hook that is called after any (single) transfer of tokens. This includes minting and burning.
+     * See {_afterConsecutiveTokenTransfer}.
      *
      * Calling conditions:
      *
@@ -436,8 +445,35 @@ contract DiamondNFT is IERC721 {
         uint256 tokenId
     ) internal virtual {}
 
-    function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
-        LibDiamond.DiamondStorage storage ds = LibDiamond.diamondStorage();
-        return ds.supportedInterfaces[interfaceId];
+    /**
+     * @dev Hook that is called before consecutive token transfers.
+     * Calling conditions are similar to {_beforeTokenTransfer}.
+     *
+     * The default implementation include balances updates that extensions such as {ERC721Consecutive} cannot perform
+     * directly.
+     */
+    function _beforeConsecutiveTokenTransfer(
+        address from,
+        address to,
+        uint256, /*first*/
+        uint96 size
+    ) internal virtual {
+        if (from != address(0)) {
+            s._balances[from] -= size;
+        }
+        if (to != address(0)) {
+            s._balances[to] += size;
+        }
     }
+
+    /**
+     * @dev Hook that is called after consecutive token transfers.
+     * Calling conditions are similar to {_afterTokenTransfer}.
+     */
+    function _afterConsecutiveTokenTransfer(
+        address, /*from*/
+        address, /*to*/
+        uint256, /*first*/
+        uint96 /*size*/
+    ) internal virtual {}
 }

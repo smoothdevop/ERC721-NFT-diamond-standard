@@ -1,12 +1,11 @@
-/* global ethers hre */
+/* global ethers */
 /* eslint prefer-const: "off" */
 
 const { getSelectors, FacetCutAction } = require('./libraries/diamond.js')
 
 async function deployDiamond () {
   const accounts = await ethers.getSigners()
-  const contractOwner = accounts[0];
-  // const contractOwner = "0x571B102323C3b8B8Afb30619Ac1d36d85359fb84"
+  const contractOwner = accounts[0]
 
   // deploy DiamondCutFacet
   const DiamondCutFacet = await ethers.getContractFactory('DiamondCutFacet')
@@ -21,6 +20,8 @@ async function deployDiamond () {
   console.log('Diamond deployed:', diamond.address)
 
   // deploy DiamondInit
+  // DiamondInit provides a function that is called when the diamond is upgraded to initialize state variables
+  // Read about how the diamondCut function works here: https://eips.ethereum.org/EIPS/eip-2535#addingreplacingremoving-functions
   const DiamondInit = await ethers.getContractFactory('DiamondInit')
   const diamondInit = await DiamondInit.deploy()
   await diamondInit.deployed()
@@ -29,11 +30,13 @@ async function deployDiamond () {
   // deploy facets
   console.log('')
   console.log('Deploying facets')
+
   const FacetNames = [
     'DiamondLoupeFacet',
     'OwnershipFacet',
-    'DiamondNFT'   
+    'DiamondNFT'
   ]
+  
   const cut = []
   for (const FacetName of FacetNames) {
     const Facet = await ethers.getContractFactory(FacetName)
@@ -49,30 +52,27 @@ async function deployDiamond () {
 
   // upgrade diamond with facets
   console.log('')
- try {
   console.log('Diamond Cut:', cut)
   const diamondCut = await ethers.getContractAt('IDiamondCut', diamond.address)
   let tx
   let receipt
   // call to init function
-  console.log("============================================================================");
-  console.log("=============================calling init function==========================");
   let functionCall = diamondInit.interface.encodeFunctionData('init')
-
   tx = await diamondCut.diamondCut(cut, diamondInit.address, functionCall)
-
-  console.log("============================================================================");
-  console.log("=============================called init function==========================");
   console.log('Diamond cut tx: ', tx.hash)
   receipt = await tx.wait()
   if (!receipt.status) {
     throw Error(`Diamond upgrade failed: ${tx.hash}`)
   }
   console.log('Completed diamond cut')
+
+  //call nft name and symbol
+  const diamondNFT = await ethers.getContractAt('IERC721Metadata', diamond.address)
+  console.log("=============================NFT name and symbol=============================");
+  console.log(await diamondNFT.name());
+  console.log(await diamondNFT.symbol());
   return diamond.address
- } catch (error) {
-  console.log("ERROR==========",error);
- }
+  
 }
 
 // We recommend this pattern to be able to use async/await everywhere

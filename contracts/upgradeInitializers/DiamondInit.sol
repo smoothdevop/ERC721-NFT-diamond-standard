@@ -32,7 +32,8 @@ contract DiamondInit {
         ds.supportedInterfaces[type(IERC173).interfaceId] = true;
         ds.supportedInterfaces[type(IERC721).interfaceId] = true;
         AppStorage storage s = LibAppStorage.diamondStorage();
-        s.owner = msg.sender;
+        s._name = "Diamond NFT";
+        s._symbol = unicode"💎";
         // add your own state variables
         // EIP-2535 specifies that the `diamondCut` function takes two optional
         // arguments: address _init and bytes calldata _calldata
